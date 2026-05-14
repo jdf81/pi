@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>π → ∞ 3D Visualization</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a1a; color: #e0e0e0; font-family: system-ui, sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
+#canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
+canvas { display: block; width: 100%; height: 100%; }
+#ui { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
+#ui > * { pointer-events: auto; }
+.panel { background: rgba(10, 10, 30, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(100, 140, 255, 0.2); border-radius: 14px; padding: 16px 20px; }
+#title { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); text-align: center; }
+#title h1 { font-size: 1.5rem; background: linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; }
+#title p { font-size: 0.75rem; color: #8899bb; margin-top: 4px; }
+#pi-display { position: absolute; top: 100px; right: 20px; min-width: 240px; }
+#pi-display h2 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px; color: #6688aa; margin-bottom: 6px; }
+#pi-val { font-size: 1.6rem; font-family: 'Courier New', monospace; font-weight: 700; background: linear-gradient(90deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+#formula-name { font-size: 0.8rem; color: #a78bfa; margin-top: 4px; font-style: italic; }
+#info { position: absolute; top: 100px; left: 20px; max-width: 280px; }
+#info h2 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px; color: #6688aa; margin-bottom: 8px; }
+#info p { font-size: 0.78rem; color: #99aabb; line-height: 1.5; }
+.formula-box { margin-top: 8px; padding: 8px; background: rgba(167, 139, 250, 0.08); border: 1px solid rgba(167, 139, 250, 0.15); border-radius: 8px; font-family: monospace; font-size: 0.85rem; color: #c4b5fd; text-align: center; }
+#controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.btn { background: rgba(100, 140, 255, 0.12); border: 1px solid rgba(100, 140, 255, 0.25); color: #a0b8e0; padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 0.78rem; transition: all 0.2s; white-space: nowrap; }
+.btn:hover { background: rgba(100, 140, 255, 0.25); color: #fff; border-color: #60a5fa; }
+.btn.active { background: rgba(100, 140, 255, 0.3); color: #fff; border-color: #60a5fa; box-shadow: 0 0 10px rgba(100, 165, 250, 0.4); }
+#speed-wrap { position: absolute; bottom: 80px; right: 20px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+#speed-wrap label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1.5px; color: #6688aa; }
+#speed-wrap input { width: 100px; accent-color: #60a5fa; }
+#error-msg { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(200, 50, 50, 0.9); color: white; padding: 20px; border-radius: 10px; z-index: 100; display: none; text-align: center; max-width: 400px; }
+</style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<div id="ui">
+  <div id="title" class="panel">
+    <h1>π → ∞</h1>
+    <p>Drag to orbit • Scroll to zoom</p>
+  </div>
+
+  <div id="pi-display" class="panel">
+    <h2>Current Estimate</h2>
+    <div id="pi-val">∞</div>
+    <div id="formula-name">Leibniz Formula</div>
+    <div id="iter-count" style="font-size:0.7rem; color:#6688aa; margin-top:4px;">n = 0 terms</div>
+    <div id="err-display" style="margin-top:4px; font-size:0.68rem; color:#f472b6;">error: —</div>
+  </div>
+
+  <div id="info" class="panel">
+    <h2 id="info-title">Leibniz Formula</h2>
+    <p id="info-desc">π/4 = 1 − 1/3 + 1/5 − 1/7 + ⋯ The series oscillates toward π/4 as terms extend to infinity. Each term adds a step closer to the true value of π.</p>
+    <div class="formula-box" id="formula-text">π/4 = Σ (-1)ⁿ / (2n+1)</div>
+  </div>
+
+  <div id="controls" class="panel">
+    <button class="btn active" onclick="setFormula('leibniz')">Leibniz</button>
+    <button class="btn" onclick="setFormula('basel')">Basel</button>
+    <button class="btn" onclick="setFormula('wallis')">Wallis</button>
+    <button class="btn" onclick="setFormula('montecarlo')">Monte Carlo</button>
+    <button class="btn" onclick="setFormula('viète')">Viète</button>
+    <button class="btn" onclick="resetCamera()">Reset View</button>
+  </div>
+
+  <div id="speed-wrap" class="panel">
+    <label>Speed</label>
+    <input type="range" id="speed-slider" min="1" max="100" value="30">
+    <span id="speed-val" style="font-size:0.7rem; color:#a0b8e0;">30</span>
+  </div>
+</div>
+
+<div id="error-msg">WebGL is not supported or Three.js failed to load. Please try a modern browser.</div>
+
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script>
+// === GLOBALS ===
+let scene, camera, renderer;
+let currentFormula = 'leibniz';
+let iterations = 0;
+let piEstimate = 0;
+let speed = 30;
+let monteCarloHits = 0;
+let particles = [];
+let convergenceLines = [];
+let baseTime = 0;
+let frameCount = 0;
+
+// === FORMULA DATA ===
+const formulas = {
+  leibniz: {
+    name: 'Leibniz Formula',
+    desc: 'π/4 = 1 − 1/3 + 1/5 − 1/7 + 1/9 − ⋯ The alternating series spirals toward π/4. Positive terms push above π/4, negative terms push below.',
+    formula: 'π/4 = Σ (-1)ⁿ / (2n+1)',
+    compute: (n) => { let s=0; for(let i=0;i<=n;i++) s += Math.pow(-1,i)/(2*i+1); return s*4; },
+    term: (n) => Math.pow(-1, n) / (2*n+1) * 4,
+    viz: 'spiral'
+  },
+  basel: {
+    name: 'Basel Problem',
+    desc: 'π²/6 = 1 + 1/4 + 1/9 + 1/16 + ⋯ Euler proved the sum of reciprocal squares converges to π²/6. Visualized as growing bars toward π.',
+    formula: 'π = √(6 × Σ 1/n²)',
+    compute: (n) => Math.sqrt(6 * Array.from({length:n+1}, (_,i) => 1/(i+1)**2).reduce((a,b)=>a+b,0)),
+    term: (n) => 1/((n+1)**2) * 6,
+    viz: 'bars'
+  },
+  wallis: {
+    name: 'Wallis Product',
+    desc: 'π/2 = (2/1 × 2/3) × (4/3 × 4/5) × (6/5 × 6/7) × ⋯ Each factor pair multiplies closer to π/2. Visualized as expanding rings.',
+    formula: 'π/2 = Π [(2n)² / ((2n-1)(2n+1))]',
+    compute: (n) => { let p=1; for(let i=1;i<=n;i++) p *= (4*i*i)/((2*i-1)*(2*i+1)); return p*2; },
+    term: (n) => (4*(n+1)**2)/((2*n+1)*(2*n+3)),
+    viz: 'product'
+  },
+  montecarlo: {
+    name: 'Monte Carlo Method',
+    desc: 'Throw random points in a cube. Ratio of points inside a sphere vs total approaches π/6. Geometric probability reveals π.',
+    formula: 'π ≈ 6 × (hits / total)',
+    compute: (n) => n>0 ? monteCarloHits/n*6 : 0,
+    term: () => 0,
+    viz: 'montecarlo'
+  },
+  viète: {
+    name: "Viète's Formula",
+    desc: "2/π = √(2)/2 × √(2+√2)/2 × √(2+√(2+√2))/2 × ⋯ The first infinite product in mathematics. Nested radicals converge to π.",
+    formula: 'π = 2 / Π √(2+...) / 2',
+    compute: (n) => { let a=Math.sqrt(2), p=1; for(let i=0;i<n;i++){p*=a; a=Math.sqrt(2+a);} return 2/p; },
+    term: () => 0,
+    viz: 'nested'
+  }
+};
+
+// === INIT THREE.JS ===
+function init() {
+  if (typeof THREE === 'undefined') {
+    document.getElementById('error-msg').style.display = 'block';
+    return;
+  }
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0a1a);
+  scene.fog = new THREE.FogExp2(0x0a0a1a, 0.007);
+
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+  camera.position.set(35, 25, 40);
+  camera.lookAt(0, 0, 0);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0x446688, 0.6));
+  const pLight = new THREE.PointLight(0x60a5fa, 1.2, 150);
+  pLight.position.set(30, 40, 30);
+  scene.add(pLight);
+  const pLight2 = new THREE.PointLight(0xf472b6, 0.6, 150);
+  pLight2.position.set(-20, -10, -20);
+  scene.add(pLight2);
+
+  createAxes();
+  createGrid();
+  setFormula('leibniz');
+  setupMouseControls();
+  baseTime = Date.now();
+  requestAnimationFrame(animate);
+}
+
+function createAxes() {
+  const matX = new THREE.LineBasicMaterial({ color: 0x60a5fa });
+  const matY = new THREE.LineBasicMaterial({ color: 0x34d399 });
+  const matZ = new THREE.LineBasicMaterial({ color: 0xf472b6 });
+  
+  const axes = [
+    { dir: [1,0,0], mat: matX, range: [-50, 50], label: 'X', color: '#60a5fa' },
+    { dir: [0,1,0], mat: matY, range: [-10, 70], label: 'Y', color: '#34d399' },
+    { dir: [0,0,1], mat: matZ, range: [-50, 50], label: 'Z', color: '#f472b6' }
+  ];
+
+  axes.forEach(a => {
+    const pts = [new THREE.Vector3(0,0,0), new THREE.Vector3(...a.dir.map(d => d * a.range[1]))];
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    scene.add(new THREE.Line(geo, a.mat));
+    
+    const c = document.createElement('canvas');
+    const ctx = c.getContext('2d');
+    c.width = c.height = 64;
+    ctx.font = 'bold 40px Arial';
+    ctx.fillStyle = a.color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(a.label, 32, 32);
+    const tex = new THREE.CanvasTexture(c);
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+    spr.position.set(a.dir[0]*52, a.dir[1]*52, a.dir[2]*52);
+    spr.scale.set(4,4,1);
+    scene.add(spr);
+  });
+}
+
+function createGrid() {
+  const grid = new THREE.GridHelper(100, 20, 0x1a2a4a, 0x111a30);
+  grid.position.y = -15;
+  scene.add(grid);
+}
+
+function setupMouseControls() {
+  let isDown = false, prev = {x:0,y:0};
+  let theta = 0.6, phi = 0.8, radius = 65;
+
+  const el = renderer.domElement;
+  const updateCam = () => {
+    camera.position.x = radius * Math.sin(phi) * Math.cos(theta);
+    camera.position.y = radius * Math.cos(phi);
+    camera.position.z = radius * Math.sin(phi) * Math.sin(theta);
+    camera.lookAt(0,0,0);
+  };
+
+  el.addEventListener('mousedown', e => { isDown = true; prev = {x:e.clientX, y:e.clientY}; });
+  el.addEventListener('mousemove', e => {
+    if(!isDown) return;
+    theta -= (e.clientX - prev.x) * 0.005;
+    phi = Math.max(0.1, Math.min(Math.PI-0.1, phi - (e.clientY - prev.y) * 0.005));
+    prev = {x:e.clientX, y:e.clientY};
+    updateCam();
+  });
+  el.addEventListener('mouseup', () => isDown = false);
+  el.addEventListener('mouseleave', () => isDown = false);
+  el.addEventListener('wheel', e => {
+    radius = Math.max(15, Math.min(200, radius + e.deltaY * 0.1));
+    updateCam();
+  });
+
+  window._updateCam = updateCam;
+  window._cam = {theta, phi, radius};
+}
+
+function resetCamera() {
+  if(window._cam) {
+    window._cam.theta = 0.6;
+    window._cam.phi = 0.8;
+    window._cam.radius = 65;
+    window._updateCam();
+  }
+}
+
+// === FORMULA SWITCHING ===
+function setFormula(name) {
+  currentFormula = name;
+  iterations = 0;
+  piEstimate = 0;
+  monteCarloHits = 0;
+  particles.forEach(p => scene.remove(p));
+  particles = [];
+  convergenceLines.forEach(l => scene.remove(l));
+  convergenceLines = [];
+
+  document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.btn[onclick="setFormula('${name}')"]`).classList.add('active');
+
+  const f = formulas[name];
+  document.getElementById('formula-name').textContent = f.name;
+  document.getElementById('formula-text').textContent = f.formula;
+  document.getElementById('info-title').textContent = f.name;
+  document.getElementById('info-desc').textContent = f.desc;
+  document.getElementById('pi-val').textContent = '∞';
+  document.getElementById('err-display').textContent = 'error: —';
+
+  if(name === 'montecarlo') createMonteCage(); else removeMonteCage();
+}
+
+function createMonteCage() {
+  const box = new THREE.BoxGeometry(40,40,40);
+  const edges = new THREE.EdgesGeometry(box);
+  scene.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({color:0x334466, transparent:true, opacity:0.4})));
+  const sphere = new THREE.SphereGeometry(20, 24, 24);
+  const sEdges = new THREE.EdgesGeometry(sphere);
+  scene.add(new THREE.LineSegments(sEdges, new THREE.LineBasicMaterial({color:0xf472b6, transparent:true, opacity:0.3})));
+}
+function removeMonteCage() {
+  const toRemove = [];
+  scene.traverse(o => { if(o.geometry && o.geometry.type === 'EdgesGeometry') toRemove.push(o); });
+  toRemove.forEach(o => scene.remove(o));
+}
+
+// === VISUALIZATION HELPERS ===
+function addParticle(x,y,z, color=0xfbbf24, size=0.3, life=300) {
+  const geo = new THREE.SphereGeometry(size, 8, 8);
+  const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity:1 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x,y,z);
+  mesh.userData = { life, maxLife: life, vx:(Math.random()-0.5)*0.08, vy:(Math.random()-0.5)*0.08, vz:(Math.random()-0.5)*0.08 };
+  scene.add(mesh);
+  particles.push(mesh);
+  return mesh;
+}
+
+function addConvergenceLine(color=0xa78bfa) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(3000);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.8 });
+  const line = new THREE.Line(geo, mat);
+  line.userData = { pts: [] };
+  scene.add(line);
+  convergenceLines.push(line);
+  return line;
+}
+
+// === MAIN ANIMATION ===
+function animate() {
+  requestAnimationFrame(animate);
+  frameCount++;
+
+  const now = Date.now();
+  const elapsed = now - baseTime;
+  const stepInterval = Math.max(2, Math.floor(600 / speed));
+
+  if (elapsed > stepInterval) {
+    processIteration();
+    baseTime = now;
+  }
+
+  updateParticles();
+  renderer.render(scene, camera);
+}
+
+function processIteration() {
+  iterations++;
+  const f = formulas[currentFormula];
+  piEstimate = f.compute(iterations);
+
+  document.getElementById('pi-val').textContent = piEstimate.toFixed(12);
+  document.getElementById('iter-count').textContent = `n = ${iterations} terms`;
+  const err = Math.abs(piEstimate - Math.PI);
+  document.getElementById('err-display').textContent = `error: ${err.toExponential(4)}`;
+
+  const count = Math.min(Math.ceil(speed/3), 15);
+
+  if (currentFormula === 'leibniz') {
+    const term = f.term(iterations);
+    const angle = iterations * 0.4;
+    const r = Math.min(iterations * 0.25, 22);
+    const x = Math.cos(angle) * r;
+    const y = term * 7;
+    const z = Math.sin(angle) * r;
+    addParticle(x, y, z, term>=0 ? 0xfbbf24 : 0xf97316, 0.35, 400);
+    
+    if(convergenceLines.length===0) addConvergenceLine();
+    const line = convergenceLines[0];
+    line.userData.pts.push(new THREE.Vector3(x,y,z));
+    if(line.userData.pts.length > 1200) line.userData.pts.shift();
+    const pos = line.geometry.attributes.position.array;
+    line.userData.pts.forEach((p,i) => { pos[i*3]=p.x; pos[i*3+1]=p.y; pos[i*3+2]=p.z; });
+    line.geometry.attributes.position.needsUpdate = true;
+    line.geometry.setDrawRange(0, line.userData.pts.length);
+  }
+  else if (currentFormula === 'basel') {
+    const term = f.term(iterations);
+    if(iterations < 150) {
+      const geo = new THREE.BoxGeometry(0.8, Math.abs(term)*1.5 + 0.2, 0.8);
+      const mat = new THREE.MeshPhongMaterial({ color:0xfbbf24, transparent:true, opacity:0.65, emissive:0xfbbf24, emissiveIntensity:0.2 });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(iterations*1.1 - 70, -14, Math.sin(iterations*0.2)*4);
+      scene.add(mesh);
+      particles.push(mesh); // reuse particle array for cleanup
+    }
+    addParticle(iterations*1.3 - 80, -10 + term*2, Math.sin(iterations*0.25)*5, 0x34d399, 0.25, 250);
+  }
+  else if (currentFormula === 'wallis') {
+    const term = f.term(iterations);
+    const angle = iterations * 0.35;
+    const r = 8 + iterations * 0.18;
+    const x = Math.cos(angle)*r, y = (term-1)*12 + Math.sin(iterations*0.1)*4, z = Math.sin(angle)*r;
+    addParticle(x,y,z, term>1 ? 0x34d399 : 0xf97316, 0.35, 350);
+    if(convergenceLines.length===0) addConvergenceLine();
+    const line = convergenceLines[0];
+    line.userData.pts.push(new THREE.Vector3(x, piEstimate/3.5, z));
+    if(line.userData.pts.length > 1200) line.userData.pts.shift();
+    const pos = line.geometry.attributes.position.array;
+    line.userData.pts.forEach((p,i) => { pos[i*3]=p.x; pos[i*3+1]=p.y; pos[i*3+2]=p.z; });
+    line.geometry.attributes.position.needsUpdate = true;
+    line.geometry.setDrawRange(0, line.userData.pts.length);
+  }
+  else if (currentFormula === 'montecarlo') {
+    monteCarloHits = 0;
+    for(let i=0;i<count;i++) {
+      const x=(Math.random()-0.5)*40, y=(Math.random()-0.5)*40, z=(Math.random()-0.5)*40;
+      const inSphere = x*x+y*y+z*z <= 400;
+      if(inSphere) monteCarloHits++;
+      addParticle(x,y,z, inSphere?0xf472b6:0x60a5fa, inSphere?0.4:0.25, 280);
+    }
+    if(convergenceLines.length===0 && iterations%20===0) addConvergenceLine(0xa78bfa);
+    if(convergenceLines.length>0 && iterations%15===0) {
+      const line = convergenceLines[0];
+      line.userData.pts.push(new THREE.Vector3(22, 0, piEstimate-3.14159));
+      if(line.userData.pts.length > 800) line.userData.pts.shift();
+      const pos = line.geometry.attributes.position.array;
+      line.userData.pts.forEach((p,i) => { pos[i*3]=p.x; pos[i*3+1]=p.y; pos[i*3+2]=p.z; });
+      line.geometry.attributes.position.needsUpdate = true;
+      line.geometry.setDrawRange(0, line.userData.pts.length);
+    }
+  }
+  else if (currentFormula === 'viète') {
+    if(iterations < 80) {
+      const r = 4 + iterations * 0.45;
+      const segs = 32;
+      const pts = [];
+      for(let i=0;i<=segs;i++) {
+        const a = (i/segs)*Math.PI*2;
+        pts.push(Math.cos(a)*r, Math.sin(a)*r + iterations*0.7, Math.sin(a)*r);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+      const line = new THREE.Line(geo, new THREE.LineBasicMaterial({color:0xfbbf24, transparent:true, opacity:0.5}));
+      scene.add(line);
+      convergenceLines.push(line);
+    }
+    addParticle(0, (piEstimate-3.14159)*6, 0, 0xa78bfa, 0.5, 200);
+  }
+
+  // Cleanup
+  if(particles.length > 600) particles.splice(0, particles.length-400).forEach(p => scene.remove(p));
+}
+
+function updateParticles() {
+  for(let i=particles.length-1; i>=0; i--) {
+    const p = particles[i];
+    if(p.userData.life !== undefined) {
+      p.userData.life--;
+      const ratio = p.userData.life / p.userData.maxLife;
+      p.material.opacity = ratio;
+      p.position.x += p.userData.vx;
+      p.position.y += p.userData.vy;
+      p.position.z += p.userData.vz;
+      p.scale.setScalar(0.4 + ratio*0.6);
+      if(p.userData.life <= 0) { scene.remove(p); particles.splice(i,1); }
+    }
+  }
+}
+
+// === EVENTS ===
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+document.getElementById('speed-slider').addEventListener('input', e => {
+  speed = parseInt(e.target.value);
+  document.getElementById('speed-val').textContent = speed;
+});
+
+// Start
+init();
+</script>
+</body>
+</html>
